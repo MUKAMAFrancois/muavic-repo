@@ -128,9 +128,12 @@ def download_video_from_youtube(download_path, yt_id):
         downloaded = True
     else:
         url = f"https://www.youtube.com/watch?v={yt_id}"
-        # downloads the best `mp4` audio/video resolution.
-        # TODO: download only video (no audio)
-        ydl_opts = {"quiet": True, "format": "mp4", "outtmpl": str(video_out_path)}
+        # UPDATED: Force high quality (Best Video + Best Audio merged to MP4)
+        ydl_opts = {
+            "quiet": True, 
+            "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+            "outtmpl": str(video_out_path)
+        }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             try:
                 ydl.download([url])

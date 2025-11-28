@@ -346,7 +346,7 @@ def segment_ted2020_sents(src_sents, tgt_sents):
     assert len(src_sents) == len(tgt_sents)
     # regex to represent end-of-sentence
     SENT_END_REGEX = re.compile(
-        "(?<=(?<!Mr)(?<!Mrs)(?<!Ms)(?<!Dr)(?<!Jr)[.!,?؟،])\s{1,2}"
+        r"(?<=(?<!Mr)(?<!Mrs)(?<!Ms)(?<!Dr)(?<!Jr)[.!,?؟،])\s{1,2}"
     )  # src: https://ideone.com/25TUP2
     # create punctuation segmenter
     segmenter = lambda x: SENT_END_REGEX.split(x)

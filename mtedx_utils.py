@@ -49,6 +49,15 @@ def download_mtedx_lang_videos(mtedx_path, src_lang):
                 mtedx_path / f"{src_lang}-{src_lang}" / "data" / split / "wav"
             )
             yt_ids = [wav_filepath.stem for wav_filepath in wav_dir_path.glob("*")]
+            
+            # --- HACK FOR INTEGRATION TESTING ---
+            # Limit to 10 videos (approx 1.5 - 2.5 hours total)
+            # This ensures we get enough for >1hr clean data without downloading 200GB.
+            if len(yt_ids) > 10:
+                print(f"⚠️ LIMITING DOWNLOAD TO 10 VIDEOS FOR TESTING (Original: {len(yt_ids)})")
+                yt_ids = yt_ids[:10]
+            # -------------------------------------
+
             # download videos from YouTube
             downloading_status = process_map(
                 partial(download_video_from_youtube, out_path),
@@ -190,10 +199,12 @@ def preprocess_mtedx_video(mtedx_path, metadata_path, src_lang, muavic_path):
         video_to_segments = OrderedDict(
             sorted(video_to_segments.items(), key=lambda x: len(x[1]))
         )
+        print("⚠️ HACK: Limiting processing to first 2 videos only!")
+        limited_items = list(video_to_segments.items())[:2]
         out_fps = 25
         video_format = "mp4"
         in_video_dir_path = mtedx_path / "video" / src_lang / split
-        for video_id, video_segments in tqdm(video_to_segments.items()):
+        for video_id, video_segments in tqdm(limited_items):
             # check if video has been already processed:
             all_segments_are_processed = all(
                 (out_path / video_id / f"{seg['id']}.{video_format}").exists()
