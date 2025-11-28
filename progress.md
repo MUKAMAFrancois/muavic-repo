@@ -19,7 +19,7 @@ python get_data.py --root-path ./data --src-lang de
 
 # Revised Pipeline:
 1.  ASR: Whisper
-2.  MT: Llama 3.1
+2.  MT: facebook/nllb-200-distilled-600M
 3.  TTS: XTTS-v2
 4.  Duration Aligner: ("Crucial Step" - Mandatory)
 5.  Source Separation: Demucs (Extract background `accompaniment.wav`)
@@ -44,3 +44,30 @@ The frontend and backend tie this all together.
 => data: https://github.com/facebookresearch/muavic
 
 
+
+
+## Select the correct interpreter:
+Open the Command Palette in VS Code (Ctrl+Shift+P or Cmd+Shift+P).
+Type "Python: Select Interpreter".
+
+## Error installing: TTS
+      List all python versions: py -0
+      # 1. Create a Python 3.10 environment
+      conda create -n dubbing_env python=3.10 -y
+
+      # 2. Activate it
+      conda activate dubbing_env
+
+      # 3. Install PyTorch (Required before TTS)
+      # (Visit pytorch.org to get the exact command for your CUDA version if you have a GPU)
+      pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+      # 4. Install Coqui TTS
+      pip install TTS
+
+      # 5. Install Coqui TTS
+# Assuming you installed Python 3.10 executable
+      py -3.10 -m venv .venv_310 
+      Or: py -3.11 -m venv .venv_311
+      .venv_310\Scripts\activate
+      pip install TTS
