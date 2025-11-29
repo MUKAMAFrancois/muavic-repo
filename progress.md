@@ -17,19 +17,23 @@ python get_data.py --root-path ./data --src-lang es
 # 5. Download German (Limit: 10 videos)
 python get_data.py --root-path ./data --src-lang de
 
-# Revised Pipeline:
-1.  ASR: Whisper
-2.  MT: facebook/nllb-200-distilled-600M
-3.  TTS: XTTS-v2
-4.  Duration Aligner: ("Crucial Step" - Mandatory)
-5.  Source Separation: Demucs (Extract background `accompaniment.wav`)
-6.  Audio Mixing: `ffmpeg` (Mix `english_tts.wav` + `accompaniment.wav`)
-7.  LipSync: Wav2Lip (trained on data)
+### The Corrected Pipeline Order
 
-For now the pipeline will be tested on german videos (10 videos) into english.
-   Testing: the web-interface will be developed. the interface having multiple options: a user can upload a video in german and be translated to English. He can also have an option of pasting the youtube link in german and be able to download the translated video. In all cases, the duration of video must nearly match.
-   The ASR (Whisper), MT (Llama 3.1), and TTS (XTTS-v2) models are all pre-trained and can be used directly. this helps reducing training time and focusing on training Wav2Lip. We will train the Wav2Lip generator and its "expert" lip-sync discriminator.
-   the problem to solve is duration matching.
+Here is the revised, industry-standard flow:
+
+1.  ASR: Whisper (Get Text + Timestamps)
+2.  MT: NLLB-200 (Translate Text)
+3.  TTS: Coqui TTS (Generate Clean English Audio)
+4.  Duration Aligner: Align Clean TTS to Video Duration (Pad/Speed up)
+5.  Source Separation: Demucs (Extract `accompaniment.wav`)
+6.  LipSync (Wav2Lip):
+       Input: `original_video.mp4` + `aligned_clean_tts.wav`
+       Output: `lip_synced_video_clean.mp4` (Video with English lips + Clean English Voice)
+7.  Final Mixing:
+       Input: `lip_synced_video_clean.mp4` + `accompaniment.wav`
+       Tool: `ffmpeg`
+       Action: Merge the background audio with the clean speech video.
+8.  Final Result: Dubbed, Aligned, Background-Preserved Video.
 **Duration Matching (Crucial Step)**: The baseline paper noted this was a major problem.
 
 

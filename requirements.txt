@@ -1,4 +1,6 @@
 numpy
+toml
+torch
 sox
 wget
 tqdm
@@ -9,7 +11,8 @@ scikit-image
 ffmpeg-python
 opencv-python
 transformers
-torch
-TTS
 openai-whisper
 sentencepiece
+coqui-tts
+pydub
+demucs
