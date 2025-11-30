@@ -1,10 +1,11 @@
 import torch
 import os
 import sys
+import re
+from pydub import AudioSegment
 
 # 1. Set Environment Variable to agree to Coqui License automatically
-# This is crucial for running on AWS/Colab without user interaction
-os.environ["COQUI_TOS_AGREED"] = "1" # License Handling: XTTS requires agreeing to a license. This code accepts it automatically via os.environ
+os.environ["COQUI_TOS_AGREED"] = "1"
 
 from TTS.api import TTS
 
@@ -12,83 +13,115 @@ class TTSProcessor:
     _model_cache = None
 
     def __init__(self, model_name="tts_models/multilingual/multi-dataset/xtts_v2"):
-        """
-        Initializes the XTTS-v2 Model.
-        """
-        # Auto-detect device
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         
-        # Singleton Pattern: Load model only if not already loaded
         if TTSProcessor._model_cache is None:
-            print(f"...Loading TTS Model ({model_name}) on {self.device}...")
+            print(f"🚀 Loading TTS Model ({model_name}) on {self.device}...")
             try:
-                # Initialize TTS with the model name
-                # gpu=True/False is handled by .to(device) in newer versions or init flag
                 tts = TTS(model_name)
-                
-                # Move to GPU if available
                 if self.device == "cuda":
                     tts.to(self.device)
-                
                 TTSProcessor._model_cache = tts
-                print("Good: TTS Model loaded successfully.")
+                print("✅ TTS Model loaded successfully.")
             except Exception as e:
-                print(f"!!! Error loading TTS Model: {e}")
-                # Common fix for Windows path length issues
+                print(f"❌ Error loading TTS Model: {e}")
                 if sys.platform == 'win32': 
-                    print("Hint: On Windows, enable 'Long Paths' if you see file not found errors.")
+                    print("Hint: On Windows, enable 'Long Paths'.")
                 raise
         else:
-            print("Good: Using cached TTS Model.")
+            print("✅ Using cached TTS Model.")
             
         self.tts = TTSProcessor._model_cache
 
-    def generate_audio(self, text, speaker_wav_path, output_path, language="en"):
+    def split_text_into_chunks(self, text, max_chars=200):
         """
-        Generates audio using Voice Cloning.
+        Splits long text into smaller chunks based on punctuation
+        to avoid XTTS token limit errors.
         """
-        if not os.path.exists(speaker_wav_path):
-            raise FileNotFoundError(f"Speaker reference audio not found: {speaker_wav_path}")
+        if len(text) <= max_chars:
+            return [text]
             
-        print(f"...Generating TTS for: '{text[:30]}...'")
+        # Split by sentence endings first (. ? !)
+        sentences = re.split(r'(?<=[.?!])\s+', text)
+        chunks = []
+        current_chunk = ""
+        
+        for sentence in sentences:
+            if len(current_chunk) + len(sentence) < max_chars:
+                current_chunk += sentence + " "
+            else:
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+                current_chunk = sentence + " "
+                
+        if current_chunk:
+            chunks.append(current_chunk.strip())
+            
+        return chunks
+
+    def generate_audio(self, text, speaker_wav_path, output_path, language="en"):
+        if not os.path.exists(speaker_wav_path):
+            raise FileNotFoundError(f"Speaker ref not found: {speaker_wav_path}")
+            
+        # print(f"🎙️ TTS Request: '{text[:30]}...'")
+        
+        # 1. Check if text needs chunking
+        chunks = self.split_text_into_chunks(text)
+        
+        if len(chunks) == 1:
+            # --- FAST PATH (Standard Generation) ---
+            try:
+                self.tts.tts_to_file(
+                    text=chunks[0],
+                    speaker_wav=speaker_wav_path,
+                    language=language,
+                    file_path=output_path
+                )
+                return output_path
+            except Exception as e:
+                print(f"⚠️ Standard TTS failed: {e}. Trying fallback...")
+
+        # --- SLOW PATH (Chunk & Merge) ---
+        # If we are here, text was too long or failed. We create parts and merge them.
+        print(f"   ⚠️ Long text detected ({len(text)} chars). Splitting into {len(chunks)} parts...")
+        
+        combined_audio = AudioSegment.empty()
+        temp_files = []
         
         try:
-            # XTTS Inference
-            self.tts.tts_to_file(
-                text=text,
-                speaker_wav=speaker_wav_path,
-                language=language,
-                file_path=output_path
-            )
-            print(f"Good: Audio saved to: {output_path}")
-            return output_path
+            for i, chunk in enumerate(chunks):
+                if not chunk.strip(): continue
+                
+                # Save temp file
+                temp_file = f"{output_path}_part{i}.wav"
+                temp_files.append(temp_file)
+                
+                self.tts.tts_to_file(
+                    text=chunk,
+                    speaker_wav=speaker_wav_path,
+                    language=language,
+                    file_path=temp_file
+                )
+                
+                # Load and append
+                part_audio = AudioSegment.from_file(temp_file)
+                combined_audio += part_audio
+                
+            # Export final merged file
+            combined_audio.export(output_path, format="wav")
+            print(f"💾 Merged Audio saved to: {output_path}")
+            
         except Exception as e:
-            print(f"!!! Error during generation: {e}")
+            print(f"❌ Error during Chunk/Merge: {e}")
             raise
+            
+        finally:
+            # Cleanup temp files
+            for f in temp_files:
+                if os.path.exists(f):
+                    os.remove(f)
 
-# --- Testing Block ---
+        return output_path
+
 if __name__ == "__main__":
-    from pathlib import Path
-    
-    # Define Paths (Relative for portability)
-    # Using the same file we used for ASR/MT testing
-    BASE_DIR = Path(__file__).parent.parent 
-    REF_AUDIO = BASE_DIR / "data/muavic/de/audio/train/_Hk4MOw9gsA/_Hk4MOw9gsA_0000.wav"
-    OUTPUT_FILE = "test_tts_output.wav"
-    
-    # Text we got from the Translation Step
-    TRANSLATED_TEXT = "It's so nice to be back in Tübingen."
-    
-    if REF_AUDIO.exists():
-        tts = TTSProcessor()
-        
-        tts.generate_audio(
-            text=TRANSLATED_TEXT,
-            speaker_wav_path=str(REF_AUDIO),
-            output_path=OUTPUT_FILE,
-            language="en" 
-        )
-        
-        print(f"Good: Test Complete! Generated: {OUTPUT_FILE}")
-    else:
-        print(f"!! Reference file not found at {REF_AUDIO}")
+    print("TTS Module with Chunking Ready.")
