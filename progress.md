@@ -48,8 +48,6 @@ The frontend and backend tie this all together.
 => data: https://github.com/facebookresearch/muavic
 
 
-
-
 ## Select the correct interpreter:
 Open the Command Palette in VS Code (Ctrl+Shift+P or Cmd+Shift+P).
 Type "Python: Select Interpreter".
